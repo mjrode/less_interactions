@@ -123,11 +123,11 @@ module Less
     end
 
     def self.any_expectations
-      @any_expectations ||= ExpectationArray.new()
+      @any_expectations ||= Expectations.new()
     end
 
     def self.expectations
-      @expectations ||= ExpectationArray.new()
+      @expectations ||= Expectations.new()
     end
   end
 
