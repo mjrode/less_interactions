@@ -13,7 +13,8 @@ module Less
 
       self.all_params = options
       set_instance_variables
-      options.each do |name, value|
+      all_params.each do |name, value|
+        # This calls the custom setter if there is one
         if respond_to?( "#{name}=" ) 
           send "#{name}=", value   
         end
@@ -41,7 +42,10 @@ module Less
       me = new(context, params)
       me.send :expectations_met?
       me.init
-      me.run
+      out = me.run
+      me.send :returners_met?
+      out
+      
     end
 
     # Expect certain parameters to be present. If any parameter can't be found, a {MissingParameterError} will be raised.
@@ -65,17 +69,31 @@ module Less
       end
     end
 
-    def self.expects_any *parameters
+    def self.expects_any(*parameters)
       parameters.each do |parameter|
         add_reader(parameter)
       end
       add_any_expectation(parameters)
     end
-
-
+    
+    # question for eugene - since this is a class method do all methods that are called from it
+    # need to be class methods as well 
+    # for example add_accessor and add_returner are 
+    # parameters are symbols passed to return ex. return :name
+    def self.returns(*parameters)
+      if parameters.last.is_a?(Hash)
+        options = parameters.pop
+      else
+        options = {allow_nil: true}
+      end
+      parameters.each do |parameter|
+        add_accessor(parameter)
+        add_returner(parameter, options)
+      end
+    end
 
     private
-
+    
     def all_params
       @__all_params
     end
@@ -93,7 +111,7 @@ module Less
         name = expectation.parameter
         if all_params.has_key?(name)
           instance_variable_set "@#{name}", all_params[name]
-        elsif expectation.allows_nil?
+        elsif expectation.allow_nil
           instance_variable_set "@#{name}", nil
         end
       end
@@ -101,7 +119,23 @@ module Less
 
     def self.add_reader param
       methods = (self.instance_methods + self.private_instance_methods)
-      self.send(:attr_reader, param.to_sym) unless methods.member?(param.to_sym)
+      self.send(:attr_reader, param) unless methods.member?(param)
+    end
+
+    # parameter are symbols being passed in from returns method (ex return :user)
+    def self.add_accessor(parameter)
+      methods = (self.instance_methods + self.private_instance_methods)
+      # checks to make sure another method is not present so it does not 
+      # override that method with the attr_accessor
+      self.send(:attr_accessor, parameter) unless methods.member?(parameter)
+      #p parameter
+    end
+
+    def self.add_returner(parameter, options)
+      re = Returner.new(parameter, options)
+      if returners.none? { |r| r.parameter == parameter}
+        returners.push re
+      end
     end
 
     def self.add_expectation(parameter, options)
@@ -119,7 +153,16 @@ module Less
     end
 
     def expectations_met?
+      #self.class.any_expectations.met? && self.class.expectations.met?
       self.class.any_expectations.verify!(all_params) && self.class.expectations.verify!(all_params)
+    end
+
+    def returners_met?
+      self.class.returners.verify! self
+    end
+
+    def self.returners
+      @returners ||= Returners.new()
     end
 
     def self.any_expectations

@@ -227,5 +227,46 @@ class InteractionTest < Minitest::Test
     assert_equal nil, i.instance_variable_get(:@a)
   end
 
+
+
+
+  should "return method with value if set during execution" do 
+    class InteractionReturning < Interaction
+      returns :a
+      def run; self.a = 1; self; end
+    end
+    i = InteractionReturning.run
+    assert_equal 1, i.a
+  end
+
+  should "allow returning nil when allow_nil is not specified" do 
+    class InteractionReturning2 < Interaction
+      returns :a
+      def run; self; end
+    end
+    i = InteractionReturning2.run
+    assert_equal nil, i.a
+  end
+
+  should "return method with value if set during execution regardless of allow_nil" do 
+    class InteractionReturning3 < Interaction
+      returns :a, allow_nil: false
+      def run; self.a = 1; self; end
+    end
+    i = InteractionReturning3.run
+    assert_equal 1, i.a
+  end
+
+
+  should "raise NilReturnValueError exception if allow_nil is false and value wasn't set" do 
+    class InteractionReturning4 < Interaction
+      returns :a, allow_nil: false
+      def run; self; end
+    end
+    assert_raises NilReturnValueError do
+      InteractionReturning4.run
+    end
+  end
+
   # if param is not passed in then writer does not get called
 end
